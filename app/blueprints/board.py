@@ -2,8 +2,13 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from app.extensions import db
-from app.models import Plant, Pond
-from app.services.rules import RuleError, assert_can_set_pond_status, latest_batch_for_pond
+from app.models import Plant, Pond, ReleasePass
+from app.services.rules import (
+    RuleError,
+    apply_pond_status,
+    hot_neighbor_ponds,
+    latest_batch_for_pond,
+)
 
 bp = Blueprint("board", __name__, url_prefix="/board")
 
@@ -36,14 +41,34 @@ def floor_plan():
     pond_cards = []
     for pond in ponds:
         batch = latest_batch_for_pond(pond)
-        pond_cards.append({"pond": pond, "batch": batch})
+        hot_neighbors = hot_neighbor_ponds(pond)
+        open_pass = (
+            ReleasePass.open_for(pond.id) if pond.status == Pond.STATUS_FILLING else None
+        )
+        # 注水中 + 同厂有热邻 + 无未核销签 → 待放行
+        awaiting_release = bool(
+            pond.status == Pond.STATUS_FILLING and hot_neighbors and open_pass is None
+        )
+        pond_cards.append(
+            {
+                "pond": pond,
+                "batch": batch,
+                "hot_neighbors": hot_neighbors,
+                "open_pass": open_pass,
+                "awaiting_release": awaiting_release,
+            }
+        )
 
     selected_id = request.args.get("pond", type=int)
     selected = None
     selected_batch = None
+    selected_card = None
     if selected_id:
-        selected = next((c["pond"] for c in pond_cards if c["pond"].id == selected_id), None)
-        if selected:
+        selected_card = next(
+            (c for c in pond_cards if c["pond"].id == selected_id), None
+        )
+        if selected_card:
+            selected = selected_card["pond"]
             selected_batch = latest_batch_for_pond(selected)
 
     return render_template(
@@ -52,6 +77,7 @@ def floor_plan():
         active_plant=active_plant,
         pond_cards=pond_cards,
         selected=selected,
+        selected_card=selected_card,
         selected_batch=selected_batch,
         status_labels=STATUS_LABELS,
     )
@@ -84,10 +110,13 @@ def pond_ops(pond_id: int):
     batch.notes = notes
 
     try:
-        assert_can_set_pond_status(pond, status)
-        pond.status = status
+        # 纯改池态入口：同样过邻池放行规则（注水→熟化中须持签并核销）。
+        redeemed_id = apply_pond_status(pond, status)
         db.session.commit()
-        flash(f"{pond.code} 已更新", "ok")
+        if redeemed_id is not None:
+            flash(f"{pond.code} 已更新，放行签 #{redeemed_id} 已核销", "ok")
+        else:
+            flash(f"{pond.code} 已更新", "ok")
     except RuleError as exc:
         db.session.rollback()
         flash(str(exc), "error")

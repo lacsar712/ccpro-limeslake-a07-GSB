@@ -30,12 +30,14 @@ def create_app() -> Flask:
     from app.blueprints.auth import bp as auth_bp
     from app.blueprints.board import bp as board_bp
     from app.blueprints.batches import bp as batches_bp
+    from app.blueprints.passes import bp as passes_bp
     from app.blueprints.ponds import bp as ponds_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(board_bp)
     app.register_blueprint(ponds_bp)
     app.register_blueprint(batches_bp)
+    app.register_blueprint(passes_bp)
 
     @app.route("/")
     def index():
@@ -45,6 +47,21 @@ def create_app() -> Flask:
         if current_user.is_authenticated:
             return redirect(url_for("board.floor_plan"))
         return redirect(url_for("auth.login"))
+
+    @app.context_processor
+    def inject_globals():
+        from flask_login import current_user
+
+        from app.models import ReleasePass
+
+        open_pass_count = 0
+        is_admin = bool(
+            current_user.is_authenticated
+            and getattr(current_user, "role", None) == "admin"
+        )
+        if current_user.is_authenticated:
+            open_pass_count = ReleasePass.query.filter_by(redeemed_at=None).count()
+        return {"is_admin": is_admin, "open_pass_count": open_pass_count}
 
     return app
 
@@ -80,13 +97,10 @@ def seed_demo_data() -> None:
     db.session.add(plant)
     db.session.flush()
 
+    # 种子：同厂两口池。P-01 已熟化中（热邻），P-02 注水中且未持放行签（待放行）。
     p1 = Pond(plant=plant, code="P-01", status=Pond.STATUS_SLAKING, capacity_m3=48.0)
     p2 = Pond(plant=plant, code="P-02", status=Pond.STATUS_FILLING, capacity_m3=36.0)
-    p3 = Pond(plant=plant, code="P-03", status=Pond.STATUS_DRAWN, capacity_m3=40.0)
-    p4 = Pond(plant=plant, code="P-04", status=Pond.STATUS_SLAKING, capacity_m3=42.0)
-    p5 = Pond(plant=plant, code="P-05", status=Pond.STATUS_FILLING, capacity_m3=38.0)
-    p6 = Pond(plant=plant, code="P-06", status=Pond.STATUS_DRAWN, capacity_m3=44.0)
-    db.session.add_all([p1, p2, p3, p4, p5, p6])
+    db.session.add_all([p1, p2])
     db.session.flush()
 
     now = utcnow()
@@ -97,42 +111,14 @@ def seed_demo_data() -> None:
                 started_at=now - timedelta(hours=6),
                 target_temp_c=85.0,
                 peak_temp_c=72.0,
-                notes="峰值已过，可出灰",
+                notes="热邻池：熟化中",
             ),
             SlakeBatch(
                 pond=p2,
                 started_at=now - timedelta(hours=2),
                 target_temp_c=80.0,
                 peak_temp_c=None,
-                notes="注水中，尚未测得峰值",
-            ),
-            SlakeBatch(
-                pond=p3,
-                started_at=now - timedelta(days=1),
-                target_temp_c=82.0,
-                peak_temp_c=91.0,
-                notes="已出灰批次",
-            ),
-            SlakeBatch(
-                pond=p4,
-                started_at=now - timedelta(hours=9),
-                target_temp_c=84.0,
-                peak_temp_c=66.0,
-                notes="熟化中段",
-            ),
-            SlakeBatch(
-                pond=p5,
-                started_at=now - timedelta(hours=1),
-                target_temp_c=80.0,
-                peak_temp_c=None,
-                notes="刚开池注水",
-            ),
-            SlakeBatch(
-                pond=p6,
-                started_at=now - timedelta(days=2),
-                target_temp_c=83.0,
-                peak_temp_c=88.0,
-                notes="东侧池已出灰",
+                notes="注水中，同厂有热邻，待持放行签后入熟化",
             ),
         ]
     )

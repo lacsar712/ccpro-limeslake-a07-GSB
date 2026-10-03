@@ -90,6 +90,25 @@ body {
   color: #ecfccb;
 }
 
+.nav-passes {
+  position: relative;
+}
+
+.pass-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
 .ops-main {
   flex: 1;
   padding: 24px 28px 40px;
@@ -209,6 +228,92 @@ body {
 
 .tile-status { font-weight: 700; font-size: 0.95rem; }
 .tile-meta, .tile-cap { font-size: 0.85rem; opacity: 0.9; }
+
+.tile-release-flag {
+  justify-self: start;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+}
+
+.tile-release-flag.held {
+  background: var(--ok);
+}
+
+/* 注水中且有热邻却无签：醒目虚线警示边 */
+.pond-tile.awaiting {
+  border-color: var(--danger);
+  border-style: dashed;
+  box-shadow: 0 10px 24px rgba(185, 28, 28, 0.16);
+}
+
+.release-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff;
+  display: grid;
+  gap: 8px;
+}
+
+.release-card h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--slate);
+}
+
+.release-card.needs {
+  border-color: rgba(185, 28, 28, 0.45);
+  background: #fef2f2;
+}
+
+.release-card.held {
+  border-color: rgba(15, 118, 110, 0.4);
+  background: #f0fdfa;
+}
+
+.hint.warn { color: var(--danger); font-weight: 600; }
+.hint.ok { color: var(--ok); }
+
+.hot-code {
+  display: inline-block;
+  margin: 0 2px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--slake-bg);
+  color: var(--slake-ink);
+  font-weight: 800;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  justify-self: start;
+}
+
+.pass-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.pass-panel .panel-title {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  color: var(--slate);
+}
+
+.pass-panel form .btn-small { width: auto; }
+.pass-panel table form { margin: 0; }
+
+@media (max-width: 860px) {
+  .pass-layout { grid-template-columns: 1fr; }
+}
 
 .empty-board {
   grid-column: 1 / -1;

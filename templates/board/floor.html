@@ -38,13 +38,18 @@
     {% set pond = card.pond %}
     {% set batch = card.batch %}
     <a
-      class="pond-tile status-{{ pond.status }} {% if selected and selected.id == pond.id %}selected{% endif %}"
+      class="pond-tile status-{{ pond.status }} {% if card.awaiting_release %}awaiting{% endif %} {% if selected and selected.id == pond.id %}selected{% endif %}"
       role="listitem"
       href="{{ url_for('board.floor_plan', plant_id=active_plant.id, pond=pond.id) }}"
       data-action="click->board#openDrawer"
     >
       <span class="tile-code">{{ pond.code }}</span>
       <span class="tile-status">{{ status_labels.get(pond.status, pond.status) }}</span>
+      {% if card.awaiting_release %}
+      <span class="tile-release-flag">待放行</span>
+      {% elif card.open_pass %}
+      <span class="tile-release-flag held">已持签</span>
+      {% endif %}
       <span class="tile-meta">
         {% if batch and batch.peak_temp_c is not none %}
           峰值 {{ '%.0f'|format(batch.peak_temp_c) }}℃
@@ -101,6 +106,36 @@
         {% endif %}
       </section>
 
+      {% if selected.status == 'filling' %}
+      <section class="release-card {% if selected_card.awaiting_release %}needs{% elif selected_card.open_pass %}held{% endif %}">
+        <h3>邻池放行签</h3>
+        {% if selected_card.awaiting_release %}
+          <p class="hint warn">
+            同厂热邻
+            {% for n in selected_card.hot_neighbors %}<span class="hot-code">{{ n.code }}</span>{% if not loop.last %}、{% endif %}{% endfor %}
+            正在熟化中，本池进入熟化中前须先持一张未核销放行签。
+          </p>
+          {% if is_admin %}
+          <a class="btn btn-small"
+             href="{{ url_for('passes.index', target_id=selected.id, hot_pond_id=selected_card.hot_neighbors[0].id) }}">
+            前往签发
+          </a>
+          {% else %}
+          <p class="hint">请联系管理员签发。</p>
+          {% endif %}
+        {% elif selected_card.open_pass %}
+          {% set op = selected_card.open_pass %}
+          <p class="hint ok">
+            已持未核销签 #{{ op.id }}：热邻 {{ op.hot_pond.code }}，
+            {{ op.issued_at.strftime('%Y-%m-%d %H:%M') }} 由 {{ op.issuer.username }} 签发。
+          </p>
+          <p class="hint">登记批次或改为「熟化中」时将在同一事务内核销此签。</p>
+        {% else %}
+          <p class="hint">同厂暂无熟化中池，进入熟化中无须持签。</p>
+        {% endif %}
+      </section>
+      {% endif %}
+
       {% if selected_batch %}
       <form
         class="ops-form"
@@ -128,6 +163,9 @@
           </select>
         </label>
         <p class="hint" data-form-hint-target="hint">出灰前须最近批次峰值已记且 ≥ 60℃。</p>
+        {% if selected_card.awaiting_release %}
+        <p class="hint warn">改为「熟化中」前须先持未核销邻池放行签，否则会被拦下。</p>
+        {% endif %}
         <button type="submit">保存作业记录</button>
       </form>
       {% endif %}

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}邻池放行签{% endblock %}
+{% block content %}
+<section class="pass-page">
+  <header class="page-head">
+    <div>
+      <h1>邻池放行签</h1>
+      <p>同厂已有熟化中池（热邻）时，注水池须先持一张未核销放行签，方可进入熟化中。</p>
+    </div>
+  </header>
+
+  <div class="pass-layout">
+    <section class="panel pass-panel">
+      <h2 class="panel-title">未核销签（{{ open_passes|length }}）</h2>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>目标池</th>
+            <th>热邻池</th>
+            <th>厂区</th>
+            <th>签发时刻</th>
+            <th>签发人</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pas in open_passes %}
+          <tr>
+            <td><strong>{{ pas.target_pond.code }}</strong></td>
+            <td>{{ pas.hot_pond.code }}</td>
+            <td>{{ pas.target_pond.plant.name }}</td>
+            <td>{{ pas.issued_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>{{ pas.issuer.username }}</td>
+            <td>
+              {% if is_admin %}
+              <form method="post" action="{{ url_for('passes.redeem', pass_id=pas.id) }}"
+                    onsubmit="return confirm('核销放行签 #{{ pas.id }}？');">
+                <button type="submit" class="btn btn-small">核销</button>
+              </form>
+              {% else %}
+              <span class="hint">仅管理员</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="hint">当前没有未核销放行签</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    {% if is_admin %}
+    <section class="panel pass-panel">
+      <h2 class="panel-title">签发新签</h2>
+      <form method="post" action="{{ url_for('passes.issue') }}"
+            class="ops-form" data-controller="pass-form">
+        <label>目标池（当前注水中）
+          <select name="target_pond_id" required data-pass-form-target="target"
+                  data-action="change->pass-form#filterHot">
+            <option value="">请选择目标池</option>
+            {% for p in targets %}
+            <option value="{{ p.id }}" data-plant="{{ p.plant_id }}"
+                    {% if preset_target_id == p.id %}selected{% endif %}>
+              {{ p.code }} · {{ p.plant.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>热邻池（同厂且熟化中）
+          <select name="hot_pond_id" required data-pass-form-target="hot">
+            <option value="">请选择热邻池</option>
+            {% for p in hot_options %}
+            <option value="{{ p.id }}" data-plant="{{ p.plant_id }}"
+                    {% if preset_hot_id == p.id %}selected{% endif %}>
+              {{ p.code }} · {{ p.plant.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </label>
+        <p class="hint">热邻池须与目标池同厂且当时为熟化中；同一目标池未核销签最多一张。</p>
+        <button type="submit">签发</button>
+      </form>
+    </section>
+    {% else %}
+    <section class="panel pass-panel">
+      <h2 class="panel-title">签发 / 核销</h2>
+      <p class="hint">仅管理员可签发与核销放行签。</p>
+    </section>
+    {% endif %}
+  </div>
+
+  <section class="panel pass-panel" style="margin-top:18px;">
+    <h2 class="panel-title">最近已核销签</h2>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>目标池</th>
+          <th>热邻池</th>
+          <th>厂区</th>
+          <th>签发时刻</th>
+          <th>签发人</th>
+          <th>核销时刻</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pas in redeemed_passes %}
+        <tr>
+          <td>{{ pas.target_pond.code }}</td>
+          <td>{{ pas.hot_pond.code }}</td>
+          <td>{{ pas.target_pond.plant.name }}</td>
+          <td>{{ pas.issued_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>{{ pas.issuer.username }}</td>
+          <td>{{ pas.redeemed_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="hint">暂无已核销签</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</section>
+{% endblock %}

@@ -1,10 +1,25 @@
-from flask import Blueprint, flash, redirect, render_template, request, url_for
-from flask_login import login_required, login_user, logout_user
+from functools import wraps
+
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required, login_user, logout_user
 
 from app.extensions import db
 from app.models import User
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
+
+
+def admin_required(view):
+    """仅管理员可访问（放行签签发 / 核销等）。"""
+
+    @wraps(view)
+    @login_required
+    def wrapped(*args, **kwargs):
+        if current_user.role != "admin":
+            abort(403)
+        return view(*args, **kwargs)
+
+    return wrapped
 
 
 @bp.route("/login", methods=["GET", "POST"])

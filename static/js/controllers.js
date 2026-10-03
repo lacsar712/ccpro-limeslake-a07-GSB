@@ -25,9 +25,38 @@ class FormHintController extends Controller {
     if (this.statusTarget.value === "drawn") {
       this.hintTarget.textContent =
         "当前选择「已出灰」：须存在最近批次，且峰值温度已记录并 ≥ 60℃。"
+    } else if (this.statusTarget.value === "slaking") {
+      this.hintTarget.textContent =
+        "改为「熟化中」：若同厂另有熟化中池，须已持一张未核销邻池放行签，签将在保存时核销。"
     } else {
       this.hintTarget.textContent =
         "出灰前请确认最近熟化批次已记录峰值温度且不低于 60℃。"
+    }
+  }
+}
+
+class PassFormController extends Controller {
+  static targets = ["target", "hot"]
+  connect() {
+    this.filterHot()
+  }
+  // 热邻池必须与目标池同厂：按目标池厂区过滤热邻下拉。
+  filterHot() {
+    if (!this.hasTargetTarget || !this.hasHotTarget) return
+    const plant = this.targetTarget.selectedOptions[0]?.dataset.plant || ""
+    let firstEnabled = null
+    Array.from(this.hotTarget.options).forEach((opt) => {
+      if (!opt.value) return
+      const ok = !plant || opt.dataset.plant === plant
+      opt.hidden = !ok
+      opt.disabled = !ok
+      if (ok && firstEnabled === null) firstEnabled = opt
+    })
+    if (plant) {
+      const cur = this.hotTarget.selectedOptions[0]
+      if (!cur || cur.dataset.plant !== plant) {
+        this.hotTarget.value = firstEnabled ? firstEnabled.value : ""
+      }
     }
   }
 }
@@ -72,4 +101,5 @@ class BoardController extends Controller {
 
 application.register("flash", FlashController)
 application.register("form-hint", FormHintController)
+application.register("pass-form", PassFormController)
 application.register("board", BoardController)

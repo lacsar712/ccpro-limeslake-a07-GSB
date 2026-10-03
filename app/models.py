@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from flask_login import UserMixin
+from sqlalchemy import Index, text
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db
@@ -62,6 +63,12 @@ class Pond(db.Model):
         back_populates="pond",
         cascade="all, delete-orphan",
     )
+    release_passes = db.relationship(
+        "ReleasePass",
+        foreign_keys="ReleasePass.target_pond_id",
+        back_populates="target_pond",
+        cascade="all, delete-orphan",
+    )
 
 
 class SlakeBatch(db.Model):
@@ -75,3 +82,54 @@ class SlakeBatch(db.Model):
     notes = db.Column(db.Text, nullable=False, default="")
 
     pond = db.relationship("Pond", back_populates="batches")
+
+
+class ReleasePass(db.Model):
+    """邻池放行签：注水池进入熟化中前，对同厂热邻池的持签凭证。"""
+
+    __tablename__ = "release_passes"
+    __table_args__ = (
+        # 同一目标池至多一张未核销签（核销时刻写为非空后即不再占位）。
+        # 以数据库约束兜底并发签发：两名管理员同时开签只有一张能落库。
+        Index(
+            "uq_release_pass_open_per_target",
+            "target_pond_id",
+            unique=True,
+            postgresql_where=db.text("redeemed_at IS NULL"),
+            sqlite_where=db.text("redeemed_at IS NULL"),
+        ),
+        db.CheckConstraint(
+            "target_pond_id <> hot_pond_id",
+            name="ck_release_pass_distinct_ponds",
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    target_pond_id = db.Column(db.Integer, db.ForeignKey("ponds.id"), nullable=False)
+    hot_pond_id = db.Column(db.Integer, db.ForeignKey("ponds.id"), nullable=False)
+    issued_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    issued_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    redeemed_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    target_pond = db.relationship(
+        "Pond",
+        foreign_keys=[target_pond_id],
+        back_populates="release_passes",
+    )
+    hot_pond = db.relationship("Pond", foreign_keys=[hot_pond_id])
+    issuer = db.relationship("User", foreign_keys=[issued_by])
+
+    @property
+    def is_open(self) -> bool:
+        return self.redeemed_at is None
+
+    @staticmethod
+    def open_for(target_pond_id: int) -> "ReleasePass | None":
+        """该目标池当前的未核销签（至多一张）。"""
+        return (
+            ReleasePass.query.filter_by(
+                target_pond_id=target_pond_id, redeemed_at=None
+            )
+            .order_by(ReleasePass.issued_at.desc())
+            .first()
+        )

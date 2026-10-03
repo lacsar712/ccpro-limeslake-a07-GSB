@@ -20,6 +20,10 @@
       </div>
       <nav class="top-nav">
         <a href="{{ url_for('board.floor_plan') }}" class="{% if request.blueprint == 'board' %}active{% endif %}">平面图</a>
+        <a href="{{ url_for('passes.index') }}" class="nav-passes {% if request.blueprint == 'passes' %}active{% endif %}">
+          放行签
+          {% if open_pass_count %}<span class="pass-badge">{{ open_pass_count }}</span>{% endif %}
+        </a>
         <a href="{{ url_for('auth.logout') }}">退出</a>
       </nav>
     </header>

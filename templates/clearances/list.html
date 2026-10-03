@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}邻池放行签{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>邻池放行签</h1>
+    <p>同厂已有熟化中池时，注水中池转入熟化中须持一张未核销放行签；转入时自动核销。</p>
+  </div>
+  <a class="btn ghost" href="{{ url_for('board.floor_plan') }}">返回平面图</a>
+</header>
+
+{% if current_user.role == 'admin' %}
+<section class="panel clearance-issue" data-controller="clearance-form">
+  <h2>签发放行签</h2>
+  {% if targets and neighbors %}
+  <form class="issue-form" method="post" action="{{ url_for('clearances.issue_clearance') }}">
+    <label>目标池（注水中）
+      <select name="target_pond_id" data-clearance-form-target="target" required>
+        {% for pond in targets %}
+        <option value="{{ pond.id }}" data-plant="{{ pond.plant_id }}">{{ pond.plant.name }} · {{ pond.code }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>热邻池（同厂熟化中）
+      <select name="neighbor_pond_id" data-clearance-form-target="neighbor" required>
+        {% for pond in neighbors %}
+        <option value="{{ pond.id }}" data-plant="{{ pond.plant_id }}">{{ pond.plant.name }} · {{ pond.code }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <p class="hint">热邻池须与目标池同厂且当前为熟化中；同一目标池未核销签至多一张。</p>
+    <div class="actions">
+      <button type="submit">签发</button>
+    </div>
+  </form>
+  {% else %}
+  <p class="hint">当前没有可签发的组合：需要至少一口注水中池与同厂一口熟化中池。</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="clearance-section">
+  <h2>未核销放行签</h2>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>目标池</th>
+        <th>热邻池</th>
+        <th>签发时刻</th>
+        <th>签发人</th>
+        {% if current_user.role == 'admin' %}<th>操作</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for ticket in open_tickets %}
+      <tr>
+        <td>{{ ticket.target_pond.plant.name }} · {{ ticket.target_pond.code }}</td>
+        <td>{{ ticket.neighbor_pond.code }}</td>
+        <td>{{ ticket.issued_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>{{ ticket.issuer.username }}</td>
+        {% if current_user.role == 'admin' %}
+        <td>
+          <form method="post" action="{{ url_for('clearances.consume_clearance', clearance_id=ticket.id) }}">
+            <button type="submit" class="btn-small">核销</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr><td colspan="{{ 5 if current_user.role == 'admin' else 4 }}">暂无未核销放行签</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% if recent_consumed %}
+<section class="clearance-section">
+  <h2>最近核销</h2>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>目标池</th>
+        <th>热邻池</th>
+        <th>签发时刻</th>
+        <th>签发人</th>
+        <th>核销时刻</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ticket in recent_consumed %}
+      <tr>
+        <td>{{ ticket.target_pond.plant.name }} · {{ ticket.target_pond.code }}</td>
+        <td>{{ ticket.neighbor_pond.code }}</td>
+        <td>{{ ticket.issued_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>{{ ticket.issuer.username }}</td>
+        <td>{{ ticket.consumed_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

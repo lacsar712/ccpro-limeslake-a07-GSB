@@ -1,10 +1,11 @@
 from datetime import datetime
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from app.extensions import db
 from app.models import Pond, SlakeBatch
+from app.services.rules import RuleError, register_batch
 
 bp = Blueprint("batches", __name__, url_prefix="/batches")
 
@@ -26,6 +27,9 @@ def create_batch():
     ponds = Pond.query.order_by(Pond.code).all()
     if request.method == "POST":
         pond_id = int(request.form["pond_id"])
+        pond = db.session.get(Pond, pond_id)
+        if pond is None:
+            abort(404)
         started_raw = request.form.get("started_at") or ""
         target = float(request.form.get("target_temp_c") or 80)
         peak_raw = (request.form.get("peak_temp_c") or "").strip()
@@ -43,14 +47,18 @@ def create_batch():
             peak_temp_c=peak,
             notes=notes,
         )
-        db.session.add(batch)
-        db.session.commit()
+        try:
+            register_batch(pond, batch)
+            db.session.commit()
+        except RuleError as exc:
+            db.session.rollback()
+            flash(str(exc), "error")
+            return render_template("batches/form.html", ponds=ponds, batch=None)
         flash("熟化批次已登记", "ok")
-        pond = db.session.get(Pond, pond_id)
         return redirect(
             url_for(
                 "board.floor_plan",
-                plant_id=pond.plant_id if pond else None,
+                plant_id=pond.plant_id,
                 pond=pond_id,
             )
         )

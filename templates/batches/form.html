@@ -4,6 +4,9 @@
 <header class="page-head">
   <div>
     <h1>{% if batch %}编辑熟化批次{% else %}登记熟化批次{% endif %}</h1>
+    {% if not batch %}
+    <p>注水中池登记批次即转入熟化中；同厂已有熟化中池时，须先持未核销的邻池放行签（登记时自动核销）。</p>
+    {% endif %}
   </div>
 </header>
 <form class="panel" method="post">

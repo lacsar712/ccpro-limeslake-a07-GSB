@@ -2,8 +2,8 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from app.extensions import db
-from app.models import Plant, Pond
-from app.services.rules import RuleError, assert_can_set_pond_status, latest_batch_for_pond
+from app.models import NeighborClearance, Plant, Pond
+from app.services.rules import RuleError, apply_pond_status, latest_batch_for_pond
 
 bp = Blueprint("board", __name__, url_prefix="/board")
 
@@ -33,18 +33,42 @@ def floor_plan():
             .all()
         )
 
+    slaking_present = any(p.status == Pond.STATUS_SLAKING for p in ponds)
+    open_tickets = {}
+    if ponds:
+        tickets = (
+            NeighborClearance.query.filter(
+                NeighborClearance.target_pond_id.in_([p.id for p in ponds]),
+                NeighborClearance.consumed_at.is_(None),
+            )
+            .all()
+        )
+        open_tickets = {t.target_pond_id: t for t in tickets}
+
     pond_cards = []
     for pond in ponds:
         batch = latest_batch_for_pond(pond)
-        pond_cards.append({"pond": pond, "batch": batch})
+        needs_clearance = pond.status == Pond.STATUS_FILLING and slaking_present
+        ticket = open_tickets.get(pond.id)
+        pond_cards.append(
+            {
+                "pond": pond,
+                "batch": batch,
+                "needs_clearance": needs_clearance,
+                "clearance": ticket,
+                "pending_release": needs_clearance and ticket is None,
+            }
+        )
 
     selected_id = request.args.get("pond", type=int)
     selected = None
     selected_batch = None
+    selected_card = None
     if selected_id:
-        selected = next((c["pond"] for c in pond_cards if c["pond"].id == selected_id), None)
-        if selected:
-            selected_batch = latest_batch_for_pond(selected)
+        selected_card = next((c for c in pond_cards if c["pond"].id == selected_id), None)
+        if selected_card:
+            selected = selected_card["pond"]
+            selected_batch = selected_card["batch"]
 
     return render_template(
         "board/floor.html",
@@ -53,6 +77,7 @@ def floor_plan():
         pond_cards=pond_cards,
         selected=selected,
         selected_batch=selected_batch,
+        selected_card=selected_card,
         status_labels=STATUS_LABELS,
     )
 
@@ -84,8 +109,7 @@ def pond_ops(pond_id: int):
     batch.notes = notes
 
     try:
-        assert_can_set_pond_status(pond, status)
-        pond.status = status
+        apply_pond_status(pond, status)
         db.session.commit()
         flash(f"{pond.code} 已更新", "ok")
     except RuleError as exc:

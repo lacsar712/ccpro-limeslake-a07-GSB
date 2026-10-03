@@ -70,6 +70,39 @@ class BoardController extends Controller {
   }
 }
 
+class ClearanceFormController extends Controller {
+  static targets = ["target", "neighbor"]
+
+  connect() {
+    if (!this.hasTargetTarget || !this.hasNeighborTarget) return
+    this.allNeighbors = Array.from(this.neighborTarget.options).map((opt) => ({
+      value: opt.value,
+      label: opt.textContent,
+      plant: opt.dataset.plant,
+    }))
+    this.targetTarget.addEventListener("change", () => this.filterNeighbors())
+    this.filterNeighbors()
+  }
+
+  filterNeighbors() {
+    const selected = this.targetTarget.selectedOptions[0]
+    const plant = selected ? selected.dataset.plant : null
+    const select = this.neighborTarget
+    select.innerHTML = ""
+    this.allNeighbors
+      .filter((n) => n.plant === plant)
+      .forEach((n) => {
+        const opt = document.createElement("option")
+        opt.value = n.value
+        opt.textContent = n.label
+        opt.dataset.plant = n.plant
+        select.appendChild(opt)
+      })
+    select.disabled = select.options.length === 0
+  }
+}
+
 application.register("flash", FlashController)
 application.register("form-hint", FormHintController)
 application.register("board", BoardController)
+application.register("clearance-form", ClearanceFormController)

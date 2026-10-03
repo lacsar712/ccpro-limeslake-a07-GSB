@@ -15,6 +15,7 @@
       <span class="leg-item filling">注水中</span>
       <span class="leg-item slaking">熟化中</span>
       <span class="leg-item drawn">已出灰</span>
+      <span class="leg-item pending">待放行</span>
     </div>
   </header>
 
@@ -55,6 +56,11 @@
         {% endif %}
       </span>
       <span class="tile-cap">{{ '%.0f'|format(pond.capacity_m3) }} m³</span>
+      {% if card.pending_release %}
+      <span class="tile-flag pending">待放行</span>
+      {% elif card.clearance %}
+      <span class="tile-flag cleared">已持签</span>
+      {% endif %}
     </a>
     {% else %}
     <p class="empty-board">当前厂区暂无熟化池</p>
@@ -87,6 +93,22 @@
     </div>
 
     <div class="drawer-body">
+      {% if selected_card and selected_card.needs_clearance %}
+      <section class="batch-card">
+        <h3>邻池放行</h3>
+        {% if selected_card.clearance %}
+        <p class="hint">
+          已持未核销放行签（{{ selected_card.clearance.issuer.username }} 签发于
+          {{ selected_card.clearance.issued_at.strftime('%Y-%m-%d %H:%M') }}），
+          转入熟化中时自动核销。
+        </p>
+        {% else %}
+        <p class="hint warn">同厂存在熟化中池，本池转入熟化中前须先由管理员签发邻池放行签。</p>
+        <p class="hint"><a href="{{ url_for('clearances.list_clearances') }}">前往放行签专页 →</a></p>
+        {% endif %}
+      </section>
+      {% endif %}
+
       <section class="batch-card">
         <h3>最近熟化批次</h3>
         {% if selected_batch %}

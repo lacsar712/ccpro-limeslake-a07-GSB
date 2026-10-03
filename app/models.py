@@ -75,3 +75,32 @@ class SlakeBatch(db.Model):
     notes = db.Column(db.Text, nullable=False, default="")
 
     pond = db.relationship("Pond", back_populates="batches")
+
+
+class NeighborClearance(db.Model):
+    """邻池放行签：同厂已有熟化中池时，注水中池转入熟化中的通行凭证。
+
+    未核销签对同一目标池至多一张，由部分唯一索引在数据库层兜底（并发双签只落一张）。
+    """
+
+    __tablename__ = "neighbor_clearances"
+    __table_args__ = (
+        db.Index(
+            "uq_neighbor_clearance_open_target",
+            "target_pond_id",
+            unique=True,
+            postgresql_where=db.text("consumed_at IS NULL"),
+            sqlite_where=db.text("consumed_at IS NULL"),
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    target_pond_id = db.Column(db.Integer, db.ForeignKey("ponds.id"), nullable=False)
+    neighbor_pond_id = db.Column(db.Integer, db.ForeignKey("ponds.id"), nullable=False)
+    issued_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    issued_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    consumed_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    target_pond = db.relationship("Pond", foreign_keys=[target_pond_id])
+    neighbor_pond = db.relationship("Pond", foreign_keys=[neighbor_pond_id])
+    issuer = db.relationship("User", foreign_keys=[issued_by_id])
